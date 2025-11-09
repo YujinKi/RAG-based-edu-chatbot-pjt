@@ -1,0 +1,153 @@
+/**
+ * Shared Component Styles
+ * Reusable button, input, and form styles
+ */
+
+/* Buttons */
+.btn {
+  border: none;
+  padding: var(--space-md) var(--space-xl);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  transition: all var(--transition-base);
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600));
+  color: var(--color-white);
+  box-shadow: var(--shadow-primary);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-primary-hover);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, var(--color-cyan-500), var(--color-cyan-600));
+  color: var(--color-white);
+  box-shadow: var(--shadow-cyan);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-cyan-hover);
+}
+
+.btn:disabled {
+  background: linear-gradient(135deg, var(--color-gray-300), var(--color-gray-400));
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Inputs */
+.input {
+  padding: var(--space-md) var(--space-lg);
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  transition: all var(--transition-base);
+  background: var(--color-white);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 44px;
+  max-height: 120px;
+  resize: vertical;
+  padding: var(--space-md) var(--space-base);
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--color-gray-200);
+  font-size: var(--font-size-base);
+  font-family: var(--font-family-base);
+  transition: all var(--transition-base);
+  background: var(--color-white);
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Select */
+.select {
+  padding: 10px var(--space-md);
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  background: var(--color-white);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Cards */
+.card {
+  background: var(--color-white);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+}
+
+.card-bordered {
+  border: 1px solid var(--color-gray-200);
+}
+
+/* Alert/Message boxes */
+.alert {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+  font-size: var(--font-size-base);
+}
+
+.alert-error {
+  color: var(--color-error-600);
+  background: var(--color-error-50);
+  border: 1px solid var(--color-error-200);
+}
+
+.alert-warning {
+  color: var(--color-warning-600);
+  background: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+}
+
+.alert-success {
+  color: var(--color-success-600);
+  background: var(--color-success-50);
+  border: 1px solid var(--color-success-500);
+}
+
+/* Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: var(--color-gray-100);
+  border-radius: var(--radius-lg);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: var(--radius-lg);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
