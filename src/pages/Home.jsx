@@ -33,6 +33,17 @@ function Home() {
               시험 일정에 맞춰 맞춤형 학습 계획을 생성합니다
             </p>
           </div>
+
+          <div
+            className="feature-card"
+            onClick={() => navigate('/document-analyzer')}
+          >
+            <div className="card-icon">📄</div>
+            <h2 className="card-title">학습 자료 분석</h2>
+            <p className="card-description">
+              PDF 문서를 업로드하고 AI로 분석 및 질문답변을 받으세요
+            </p>
+          </div>
         </div>
       </div>
     </div>

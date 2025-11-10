@@ -6,6 +6,7 @@ import Footer from './components/Footer/Footer';
 import Home from './pages/Home';
 import StudyPlan from './pages/StudyPlan';
 import Chatbot from './pages/Chatbot';
+import DocumentAnalyzer from './pages/DocumentAnalyzer';
 
 function AppContent() {
   const location = useLocation();
@@ -19,6 +20,7 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/chatbot" element={<Chatbot />} />
           <Route path="/study-plan" element={<StudyPlan />} />
+          <Route path="/document-analyzer" element={<DocumentAnalyzer />} />
         </Routes>
       </main>
       <Footer />
