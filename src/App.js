@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import About from './pages/About';
 import Contact from './pages/Contact';
 import ApiTest from './pages/ApiTest';
+import StudyPlan from './pages/StudyPlan';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/study-plan" element={<StudyPlan />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/api-test" element={<ApiTest />} />
