@@ -1,0 +1,608 @@
+.document-analyzer-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+/* 탭 네비게이션 */
+.tab-navigation {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.tab-btn {
+  padding: 0.75rem 1.5rem;
+  background: rgba(255, 255, 255, 0.5);
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  color: #2c3e50;
+}
+
+.tab-btn:hover {
+  background: rgba(102, 126, 234, 0.1);
+  border-color: rgba(102, 126, 234, 0.6);
+  transform: translateY(-2px);
+}
+
+.tab-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.tab-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 에러 메시지 */
+.error-message {
+  background: rgba(255, 68, 68, 0.1);
+  border: 2px solid rgba(255, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  color: #d63031;
+  font-weight: 600;
+}
+
+/* 탭 콘텐츠 */
+.tab-content {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  min-height: 500px;
+}
+
+.tab-panel h2 {
+  margin-bottom: 1.5rem;
+  color: #2c3e50;
+  font-size: 1.8rem;
+}
+
+/* 업로드 섹션 */
+.upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.file-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.file-input {
+  padding: 1rem;
+  border: 2px dashed rgba(102, 126, 234, 0.5);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file-input:hover {
+  border-color: rgba(102, 126, 234, 0.8);
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.selected-file {
+  font-weight: 600;
+  color: #667eea;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.action-btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.action-btn:hover {
+  background: rgba(102, 126, 234, 0.2);
+  transform: translateY(-2px);
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.action-btn.primary:hover {
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 업로드된 파일 목록 */
+.uploaded-files-section {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.section-header h3 {
+  color: #2c3e50;
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+.danger-btn-small {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 68, 68, 0.1);
+  border: 2px solid rgba(255, 68, 68, 0.3);
+  border-radius: 8px;
+  font-weight: 600;
+  color: #d63031;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.danger-btn-small:hover {
+  background: rgba(255, 68, 68, 0.2);
+  border-color: rgba(255, 68, 68, 0.6);
+}
+
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.file-icon {
+  font-size: 2rem;
+}
+
+.file-info {
+  flex: 1;
+}
+
+.file-name {
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0;
+}
+
+.file-meta {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  margin: 0.25rem 0 0 0;
+}
+
+.no-files {
+  text-align: center;
+  color: #95a5a6;
+  padding: 2rem;
+}
+
+/* 텍스트 콘텐츠 */
+.text-content,
+.preview-content,
+.structured-content {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.text-content pre,
+.preview-content pre,
+.structured-content pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: #2c3e50;
+}
+
+.empty-message {
+  text-align: center;
+  color: #95a5a6;
+  padding: 3rem;
+  font-size: 1.1rem;
+}
+
+/* 질문답변 섹션 */
+.qa-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.question-input {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.question-textarea {
+  padding: 1rem;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.question-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.send-btn {
+  align-self: flex-end;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.send-btn:hover {
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.answer-box {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border-radius: 16px;
+  padding: 1.5rem;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.answer-box h3 {
+  color: #667eea;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+.answer-box p {
+  line-height: 1.8;
+  color: #2c3e50;
+}
+
+.sources {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid rgba(102, 126, 234, 0.2);
+  font-size: 0.9rem;
+  color: #7f8c8d;
+}
+
+/* 채팅 섹션 */
+.chat-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 600px;
+}
+
+.chat-history {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 12px;
+  padding: 1rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chat-message {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 80%;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+}
+
+.chat-message.assistant {
+  align-self: flex-start;
+}
+
+.message-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #7f8c8d;
+}
+
+.message-content {
+  padding: 1rem;
+  border-radius: 12px;
+  line-height: 1.6;
+}
+
+.chat-message.user .message-content {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.chat-message.assistant .message-content {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  color: #2c3e50;
+}
+
+.chat-input {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chat-textarea {
+  padding: 1rem;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  resize: none;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.chat-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+/* 퀴즈 섹션 */
+.quiz-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.quiz-settings {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.setting-item label {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.number-input {
+  width: 80px;
+  padding: 0.5rem;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.difficulty-select {
+  padding: 0.5rem 1rem;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
+}
+
+.generate-btn {
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.generate-btn:hover {
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+.generate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.quiz-result {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.quiz-result h3 {
+  color: #667eea;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.quiz-meta {
+  color: #7f8c8d;
+  margin-bottom: 2rem;
+}
+
+.questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.question-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.question-card h4 {
+  color: #667eea;
+  margin-bottom: 1rem;
+}
+
+.question-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.option {
+  padding: 0.75rem;
+  background: rgba(102, 126, 234, 0.05);
+  border-radius: 8px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.answer-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.answer-section p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+  color: #2c3e50;
+}
+
+.answer-section strong {
+  color: #667eea;
+}
+
+/* 스크롤바 스타일 */
+.text-content::-webkit-scrollbar,
+.preview-content::-webkit-scrollbar,
+.structured-content::-webkit-scrollbar,
+.chat-history::-webkit-scrollbar {
+  width: 8px;
+}
+
+.text-content::-webkit-scrollbar-track,
+.preview-content::-webkit-scrollbar-track,
+.structured-content::-webkit-scrollbar-track,
+.chat-history::-webkit-scrollbar-track {
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 4px;
+}
+
+.text-content::-webkit-scrollbar-thumb,
+.preview-content::-webkit-scrollbar-thumb,
+.structured-content::-webkit-scrollbar-thumb,
+.chat-history::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.5);
+  border-radius: 4px;
+}
+
+.text-content::-webkit-scrollbar-thumb:hover,
+.preview-content::-webkit-scrollbar-thumb:hover,
+.structured-content::-webkit-scrollbar-thumb:hover,
+.chat-history::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 126, 234, 0.7);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .tab-navigation {
+    flex-wrap: nowrap;
+  }
+
+  .tab-btn {
+    font-size: 0.85rem;
+    padding: 0.6rem 1rem;
+  }
+
+  .tab-content {
+    padding: 1.5rem;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
+
+  .chat-message {
+    max-width: 90%;
+  }
+
+  .quiz-settings {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

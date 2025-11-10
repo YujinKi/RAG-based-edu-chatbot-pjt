@@ -16,6 +16,9 @@ function Navigation() {
           <li className="nav-item">
             <Link to="/study-plan" className="nav-link">학습 계획</Link>
           </li>
+          <li className="nav-item">
+            <Link to="/document-analyzer" className="nav-link">자료 분석</Link>
+          </li>
         </ul>
       </div>
     </nav>
