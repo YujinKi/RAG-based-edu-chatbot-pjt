@@ -2,7 +2,7 @@
  * App Component Styles
  */
 
-.App {
+ .App {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -17,19 +17,23 @@
   width: 100%;
 }
 
+/* Chatbot 페이지에서는 padding 제거 */
+.main-content.chatbot-page {
+  padding: 0;
+  max-width: 100%;
+}
+
 /* Page Container */
 .page-container {
-  animation: fadeIn 0.5s ease-in;
+  animation: fadeIn 0.3s ease-in;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 

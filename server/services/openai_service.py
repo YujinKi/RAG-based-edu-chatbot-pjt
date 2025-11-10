@@ -224,3 +224,70 @@ async def chat_with_ai(messages: List[Dict[str, str]]) -> str:
     except Exception as e:
         print(f"OpenAI Chat API Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate response: {str(e)}")
+
+
+async def chat_with_ai_and_file(messages: List[Dict[str, str]], file_content: str, filename: str) -> str:
+    """
+    Chat with AI assistant including file content
+
+    Args:
+        messages: List of message dictionaries with 'role' and 'content'
+        file_content: Content of the uploaded file
+        filename: Name of the uploaded file
+
+    Returns:
+        AI response message
+    """
+    if not openai_client:
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI service is not available. Please set OPENAI_API_KEY in .env file"
+        )
+
+    try:
+        # System message
+        system_message = {
+            "role": "system",
+            "content": """당신은 친절하고 전문적인 학습 도우미 AI입니다.
+
+주요 역할:
+- 국가기술자격 시험 준비에 대한 조언 제공
+- 학습 계획 수립 도움
+- 시험 준비 방법 안내
+- 학습 동기 부여 및 격려
+- 학습 관련 질문에 대한 친절한 답변
+- 업로드된 파일 내용 분석 및 피드백 제공
+
+답변 스타일:
+- 친근하고 이해하기 쉬운 언어 사용
+- 구체적이고 실용적인 조언 제공
+- 긍정적이고 격려하는 태도 유지
+- 필요시 단계별로 설명
+- 이모지를 적절히 활용하여 친근감 표현
+
+한국어로 답변해주세요."""
+        }
+
+        # Add file content to the last user message
+        file_context = f"\n\n[업로드된 파일: {filename}]\n```\n{file_content}\n```"
+
+        # Combine messages with file content
+        combined_messages = messages.copy()
+        if combined_messages and combined_messages[-1]["role"] == "user":
+            combined_messages[-1]["content"] += file_context
+
+        # Call OpenAI API
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[system_message] + combined_messages,
+            temperature=0.8,
+            max_tokens=1500
+        )
+
+        ai_message = response.choices[0].message.content
+
+        return ai_message
+
+    except Exception as e:
+        print(f"OpenAI Chat API Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate response: {str(e)}")

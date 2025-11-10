@@ -3,10 +3,11 @@ OpenAI API Routes
 All endpoints for OpenAI integration
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import Dict, Any, List
+from fastapi import APIRouter, HTTPException, File, UploadFile, Form
+from typing import Dict, Any, List, Optional
+import json
 
-from services.openai_service import generate_study_plan, chat_with_ai
+from services.openai_service import generate_study_plan, chat_with_ai, chat_with_ai_and_file
 
 router = APIRouter(prefix="/api/openai", tags=["OpenAI"])
 
@@ -57,3 +58,71 @@ async def chat_endpoint(request: Dict[str, Any]):
         "success": True,
         "message": ai_message
     }
+
+
+@router.post("/chat-with-file")
+async def chat_with_file_endpoint(
+    file: UploadFile = File(...),
+    message: str = Form(""),
+    messages: str = Form("[]")
+):
+    """
+    Chat with AI assistant including a file upload
+
+    Form data:
+    - file: The uploaded file
+    - message: Current user message
+    - messages: JSON string of previous messages
+    """
+    try:
+        # Read file content
+        file_content = await file.read()
+
+        # Try to decode as UTF-8 text
+        try:
+            file_text = file_content.decode('utf-8')
+        except UnicodeDecodeError:
+            raise HTTPException(
+                status_code=400,
+                detail="파일을 읽을 수 없습니다. 텍스트 파일만 지원됩니다."
+            )
+
+        # Check file size (limit to 50KB of text)
+        if len(file_text) > 50000:
+            file_text = file_text[:50000] + "\n\n... (파일이 너무 길어 일부만 표시됩니다)"
+
+        # Parse previous messages
+        try:
+            previous_messages = json.loads(messages)
+        except:
+            previous_messages = []
+
+        # Add current message to history
+        if message:
+            previous_messages.append({
+                "role": "user",
+                "content": message
+            })
+        else:
+            previous_messages.append({
+                "role": "user",
+                "content": "이 파일의 내용을 분석해주세요."
+            })
+
+        # Get AI response with file content
+        ai_message = await chat_with_ai_and_file(
+            previous_messages,
+            file_text,
+            file.filename
+        )
+
+        return {
+            "success": True,
+            "message": ai_message
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"File upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"파일 처리 중 오류가 발생했습니다: {str(e)}")
