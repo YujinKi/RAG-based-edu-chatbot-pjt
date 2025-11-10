@@ -11,22 +11,10 @@ function Navigation() {
         </Link>
         <ul className="nav-menu">
           <li className="nav-item">
-            <Link to="/" className="nav-link">Home</Link>
-          </li>
-          <li className="nav-item">
-            <Link to="/chatbot" className="nav-link">AI 챗봇</Link>
+            <Link to="/" className="nav-link">AI 챗봇</Link>
           </li>
           <li className="nav-item">
             <Link to="/study-plan" className="nav-link">학습 계획</Link>
-          </li>
-          <li className="nav-item">
-            <Link to="/about" className="nav-link">About</Link>
-          </li>
-          <li className="nav-item">
-            <Link to="/contact" className="nav-link">Contact</Link>
-          </li>
-          <li className="nav-item">
-            <Link to="/api-test" className="nav-link">API Test</Link>
           </li>
         </ul>
       </div>
