@@ -323,6 +323,73 @@ async def generate_study_plan(request: Dict[str, Any]):
         raise HTTPException(status_code=500, detail=f"Failed to generate study plan: {str(e)}")
 
 
+@app.post("/api/openai/chat")
+async def chat(request: Dict[str, Any]):
+    """
+    Chat with AI assistant
+
+    Request body:
+    {
+        "messages": [
+            {"role": "user", "content": "질문 내용"},
+            {"role": "assistant", "content": "응답 내용"}
+        ]
+    }
+    """
+    if not openai_client:
+        raise HTTPException(
+            status_code=503,
+            detail="OpenAI service is not available. Please set OPENAI_API_KEY in .env file"
+        )
+
+    messages = request.get("messages", [])
+
+    if not messages:
+        raise HTTPException(status_code=400, detail="Messages are required")
+
+    try:
+        # 시스템 메시지 추가
+        system_message = {
+            "role": "system",
+            "content": """당신은 친절하고 전문적인 학습 도우미 AI입니다.
+
+주요 역할:
+- 국가기술자격 시험 준비에 대한 조언 제공
+- 학습 계획 수립 도움
+- 시험 준비 방법 안내
+- 학습 동기 부여 및 격려
+- 학습 관련 질문에 대한 친절한 답변
+
+답변 스타일:
+- 친근하고 이해하기 쉬운 언어 사용
+- 구체적이고 실용적인 조언 제공
+- 긍정적이고 격려하는 태도 유지
+- 필요시 단계별로 설명
+- 이모지를 적절히 활용하여 친근감 표현
+
+한국어로 답변해주세요."""
+        }
+
+        # OpenAI API 호출
+        response = openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[system_message] + messages,
+            temperature=0.8,
+            max_tokens=1000
+        )
+
+        ai_message = response.choices[0].message.content
+
+        return {
+            "success": True,
+            "message": ai_message
+        }
+
+    except Exception as e:
+        print(f"OpenAI Chat API Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate response: {str(e)}")
+
+
 def format_date(date_str: str) -> str:
     """Format date string from yyyymmdd to yyyy년 mm월 dd일"""
     if not date_str or len(date_str) != 8:
@@ -365,8 +432,9 @@ if __name__ == "__main__":
   📋 Q-Net 국가기술자격:
   - GET /api/qnet/qualification-list
 
-  🤖 OpenAI 학습 계획:
-  - POST /api/openai/generate-study-plan
+  🤖 OpenAI:
+  - POST /api/openai/generate-study-plan  (학습 계획 생성)
+  - POST /api/openai/chat                 (AI 챗봇)
 
   Ready to serve! 🚀
   """)

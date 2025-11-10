@@ -8,6 +8,7 @@ import About from './pages/About';
 import Contact from './pages/Contact';
 import ApiTest from './pages/ApiTest';
 import StudyPlan from './pages/StudyPlan';
+import Chatbot from './pages/Chatbot';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <main className="main-content">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/chatbot" element={<Chatbot />} />
             <Route path="/study-plan" element={<StudyPlan />} />
             <Route path="/about" element={<About />} />
             <Route path="/contact" element={<Contact />} />
