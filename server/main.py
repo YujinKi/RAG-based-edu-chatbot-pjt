@@ -11,6 +11,7 @@ from routes.qnet_routes import router as qnet_router
 from routes.openai_routes import router as openai_router
 from routes.pdf_routes import router as pdf_router
 from routes.rag_routes import router as rag_router
+from routes.pdfupload_routes import router as quiz_router
 
 # Initialize FastAPI app
 app = FastAPI(title="Study Helper API")
@@ -29,6 +30,7 @@ app.include_router(qnet_router)
 app.include_router(openai_router)
 app.include_router(pdf_router)
 app.include_router(rag_router)
+app.include_router(quiz_router)
 
 
 @app.get("/api/health")
@@ -100,6 +102,10 @@ if __name__ == "__main__":
   - DELETE /api/rag/knowledge-bases/{name}  (지식 베이스 삭제)
   - GET    /api/rag/conversation/{id}   (대화 이력 조회)
   - DELETE /api/rag/conversation/{id}   (대화 이력 삭제)
+
+  📝 Quiz Generation (Gemini AI):
+  - POST   /api/quiz/upload-and-generate  (PDF 업로드 및 AI 퀴즈 생성)
+  - GET    /api/quiz/health               (서비스 상태 확인)
 
   Ready to serve! 🚀
   """)

@@ -83,14 +83,15 @@ function Chatbot() {
     const data = await uploadPdfToServer(file); // ✅ FastAPI로 전송
     setIsLoading(false);
 
-    if (data.status === "success") {
+    if (data.success && data.questions && data.questions.length > 0) {
       setQuizQuestions(data.questions);
       setCurrentQuestionIndex(0);
       setIsQuizMode(true);
-      addBotMessage("PDF 분석이 완료되었습니다. 퀴즈를 시작할게요 😄");
+      addBotMessage(`PDF 분석이 완료되었습니다! 총 ${data.total_questions}개의 문제를 생성했습니다. 퀴즈를 시작할게요 😄`);
       showNextQuestion(data.questions[0]);
     } else {
-      addBotMessage("❌ 문제 생성에 실패했습니다. 다시 시도해주세요.");
+      const errorMsg = data.message || "문제 생성에 실패했습니다";
+      addBotMessage(`❌ ${errorMsg}. 다시 시도해주세요.`);
     }
 
     // 업로드 후 input 초기화

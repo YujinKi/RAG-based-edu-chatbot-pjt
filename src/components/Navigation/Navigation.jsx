@@ -11,9 +11,6 @@ function Navigation() {
         </Link>
         <ul className="nav-menu">
           <li className="nav-item">
-            <Link to="/chatbot" className="nav-link">AI 챗봇</Link>
-          </li>
-          <li className="nav-item">
             <Link to="/study-plan" className="nav-link">학습 계획</Link>
           </li>
           <li className="nav-item">
