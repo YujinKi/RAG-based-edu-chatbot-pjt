@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './DocumentAnalyzer.css';
-import { uploadPdfToServer } from './PdfUploader';
 
 function DocumentAnalyzer() {
   // 마크다운 텍스트를 HTML로 변환하는 함수
@@ -56,6 +55,7 @@ function DocumentAnalyzer() {
   };
   const [activeTab, setActiveTab] = useState('chat');
   const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [selectedFileUri, setSelectedFileUri] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -64,9 +64,7 @@ function DocumentAnalyzer() {
   const [chatHistory, setChatHistory] = useState([]);
   const [conversationId, setConversationId] = useState('');
 
-  // 퀴즈 관련
-  const [quiz, setQuiz] = useState(null);
-  const [numQuestions, setNumQuestions] = useState(5);
+  // 퀴즈 설정
   const [difficulty, setDifficulty] = useState('medium');
 
   // PDF 퀴즈 챗봇 관련
@@ -74,8 +72,7 @@ function DocumentAnalyzer() {
     {
       id: 1,
       role: 'assistant',
-      content: '안녕하세요! 학습 도우미 AI입니다 😊\nPDF를 업로드하면 자동으로 문제를 만들어드릴게요!',
-      timestamp: new Date()
+      content: '안녕하세요! 학습 도우미 AI입니다 😊\n위에서 파일을 선택하고 설정을 완료한 후 "퀴즈 시작" 버튼을 누르면 문제를 만들어드릴게요!'
     }
   ]);
   const [pdfQuizInput, setPdfQuizInput] = useState('');
@@ -83,11 +80,9 @@ function DocumentAnalyzer() {
   const [pdfQuizQuestions, setPdfQuizQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isQuizMode, setIsQuizMode] = useState(false);
-  const [conversations, setConversations] = useState([{ id: 1, title: '새 대화', active: true }]);
-  const [activeConversationId, setActiveConversationId] = useState(1);
+  const [isGeneratingMore, setIsGeneratingMore] = useState(false);
 
   const messagesContainerRef = useRef(null);
-  const pdfQuizFileInputRef = useRef(null);
 
   // 업로드된 파일 목록 로드
   useEffect(() => {
@@ -164,56 +159,23 @@ function DocumentAnalyzer() {
     }
   };
 
-  // 퀴즈 생성
-  const generateQuiz = async () => {
-    if (uploadedFiles.length === 0) {
-      setError('먼저 파일을 업로드해주세요.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('http://localhost:3001/api/rag/generate-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_uri: uploadedFiles[0].name,
-          num_questions: numQuestions,
-          difficulty: difficulty,
-          model_name: 'gemini-2.5-flash'
-        })
-      });
-
-      if (!response.ok) throw new Error('Failed to generate quiz');
-
-      const data = await response.json();
-      setQuiz(data.quiz);
-    } catch (err) {
-      setError('퀴즈 생성 실패: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // PDF 퀴즈 챗봇 헬퍼 함수
   const addPdfQuizBotMessage = (content) => {
     setPdfQuizMessages((prev) => [
       ...prev,
-      { id: prev.length + 1, role: 'assistant', content, timestamp: new Date() }
+      { id: prev.length + 1, role: 'assistant', content }
     ]);
   };
 
   const addPdfQuizUserMessage = (content) => {
     setPdfQuizMessages((prev) => [
       ...prev,
-      { id: prev.length + 1, role: 'user', content, timestamp: new Date() }
+      { id: prev.length + 1, role: 'user', content }
     ]);
   };
 
-  const showNextQuestion = (qObj) => {
-    const formatted = `📘 문제 ${currentQuestionIndex + 1}\n${qObj.question}\n\n${qObj.options
+  const showNextQuestion = (qObj, questionNumber) => {
+    const formatted = `📘 문제 ${questionNumber}\n${qObj.question}\n\n${qObj.options
       .map((opt, i) => `${i + 1}) ${opt}`)
       .join('\n')}`;
     addPdfQuizBotMessage(formatted);
@@ -232,84 +194,147 @@ function DocumentAnalyzer() {
       return;
     }
 
-    // 일반 채팅
-    addPdfQuizBotMessage('PDF를 업로드하면 문제를 만들어드릴게요!');
+    // 퀴즈 모드가 아닐 때는 메시지 전송 불가
+    addPdfQuizBotMessage('위에서 파일을 선택하고 "퀴즈 시작" 버튼을 눌러주세요!');
   };
 
-  // PDF 퀴즈 파일 선택
-  const handlePdfQuizFileSelect = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    addPdfQuizUserMessage(`📎 ${file.name} 업로드`);
-    setPdfQuizLoading(true);
-
-    const data = await uploadPdfToServer(file);
-    setPdfQuizLoading(false);
-
-    if (data.success && data.questions && data.questions.length > 0) {
-      setPdfQuizQuestions(data.questions);
-      setCurrentQuestionIndex(0);
-      setIsQuizMode(true);
-      addPdfQuizBotMessage(`PDF 분석이 완료되었습니다! 총 ${data.total_questions}개의 문제를 생성했습니다. 퀴즈를 시작할게요 😄`);
-      showNextQuestion(data.questions[0]);
-    } else {
-      const errorMsg = data.message || '문제 생성에 실패했습니다';
-      addPdfQuizBotMessage(`❌ ${errorMsg}. 다시 시도해주세요.`);
+  // 업로드된 파일로 퀴즈 생성 (Gemini API 직접 사용 - 5문제 배치)
+  const handleGenerateQuizFromFile = async () => {
+    if (!selectedFileUri) {
+      setError('파일을 선택해주세요.');
+      return;
     }
 
-    // 업로드 후 input 초기화
-    e.target.value = '';
+    setPdfQuizLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/quiz/generate-from-uploaded', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_name: selectedFileUri,
+          num_questions: 5, // 5문제 배치 생성
+          difficulty: difficulty,
+          question_type: 'multiple_choice'
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate quiz');
+
+      const data = await response.json();
+
+      if (data.success && data.questions && data.questions.length > 0) {
+        setPdfQuizQuestions(data.questions); // 5문제 모두 저장
+        setCurrentQuestionIndex(0);
+        setIsQuizMode(true);
+        addPdfQuizBotMessage(`퀴즈를 시작합니다! ${data.questions.length}개의 문제가 준비되었습니다 😄`);
+        showNextQuestion(data.questions[0], 1);
+      } else {
+        addPdfQuizBotMessage('❌ 문제 생성에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch (err) {
+      console.error('Quiz generation error:', err);
+      setError('퀴즈 생성 실패: ' + err.message);
+      addPdfQuizBotMessage('❌ 퀴즈 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setPdfQuizLoading(false);
+    }
   };
 
-  // 퀴즈 정답 처리
+  // 추가 문제 배치 생성 (백그라운드에서 실행)
+  const generateMoreQuestions = async () => {
+    if (isGeneratingMore) return; // 이미 생성 중이면 중복 실행 방지
+
+    setIsGeneratingMore(true);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/quiz/generate-from-uploaded', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_name: selectedFileUri,
+          num_questions: 5, // 5문제 배치 생성
+          difficulty: difficulty,
+          question_type: 'multiple_choice'
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to generate quiz');
+
+      const data = await response.json();
+
+      if (data.success && data.questions && data.questions.length > 0) {
+        // 기존 문제 배열에 새 문제들 추가
+        setPdfQuizQuestions(prev => [...prev, ...data.questions]);
+        console.log(`✅ 추가 ${data.questions.length}개 문제 생성 완료`);
+      } else {
+        console.error('❌ 추가 문제 생성 실패');
+      }
+    } catch (err) {
+      console.error('More questions generation error:', err);
+    } finally {
+      setIsGeneratingMore(false);
+    }
+  };
+
+  // 퀴즈 정답 처리 (무한 모드 - 배치 생성)
   const handleQuizAnswer = (answerText) => {
     const currentQ = pdfQuizQuestions[currentQuestionIndex];
     const correct = currentQ.answer.trim();
+    const explanation = currentQ.explanation;
 
+    // 정답/오답 피드백
     if (answerText.includes(correct) || answerText === correct) {
-      addPdfQuizBotMessage('✅ 정답입니다! 잘하셨어요 👏');
-    } else {
-      addPdfQuizBotMessage(`❌ 오답이에요. 정답은 '${correct}'입니다.`);
-    }
-
-    const next = currentQuestionIndex + 1;
-    if (next < pdfQuizQuestions.length) {
-      setCurrentQuestionIndex(next);
-      setTimeout(() => showNextQuestion(pdfQuizQuestions[next]), 1000);
-    } else {
-      addPdfQuizBotMessage('🎉 모든 문제를 완료했습니다! 수고하셨어요!');
-      setIsQuizMode(false);
-    }
-  };
-
-  // 새 대화 시작
-  const handleNewChat = () => {
-    setConversations((prev) =>
-      prev.map((c) => ({ ...c, active: false })).concat({
-        id: prev.length + 1,
-        title: '새 대화',
-        active: true
-      })
-    );
-    setPdfQuizMessages([
-      {
-        id: 1,
-        role: 'assistant',
-        content: '새 대화를 시작합니다. PDF를 업로드하면 문제를 만들어드릴게요 😊',
-        timestamp: new Date()
+      let feedback = '✅ 정답입니다! 잘하셨어요 👏';
+      if (explanation) {
+        feedback += `\n\n💡 해설: ${explanation}`;
       }
-    ]);
-    setIsQuizMode(false);
-    setPdfQuizQuestions([]);
-    setCurrentQuestionIndex(0);
-  };
+      addPdfQuizBotMessage(feedback);
+    } else {
+      let feedback = `❌ 오답이에요. 정답은 '${correct}'입니다.`;
+      if (explanation) {
+        feedback += `\n\n💡 해설: ${explanation}`;
+      }
+      addPdfQuizBotMessage(feedback);
+    }
 
-  const handleSelectConversation = (convId) => {
-    setConversations((prev) =>
-      prev.map((c) => ({ ...c, active: c.id === convId }))
-    );
-    setActiveConversationId(convId);
+    // 다음 문제 인덱스
+    const nextIndex = currentQuestionIndex + 1;
+
+    // 다음 문제가 있으면 바로 표시
+    if (nextIndex < pdfQuizQuestions.length) {
+      setCurrentQuestionIndex(nextIndex);
+      showNextQuestion(pdfQuizQuestions[nextIndex], nextIndex + 1);
+
+      // 마지막에서 3번째 문제에 도달하면 백그라운드에서 추가 문제 생성 시작
+      if (nextIndex === pdfQuizQuestions.length - 3 && !isGeneratingMore) {
+        console.log('🔄 추가 문제 생성 시작...');
+        generateMoreQuestions();
+      }
+    } else {
+      // 문제가 더 이상 없는 경우 (추가 생성이 완료되지 않았을 때)
+      addPdfQuizBotMessage('다음 문제를 준비하고 있습니다... ⏳');
+
+      // 추가 문제 생성이 시작되지 않았다면 시작
+      if (!isGeneratingMore) {
+        generateMoreQuestions();
+      }
+
+      // 추가 문제가 생성될 때까지 대기 (최대 30초)
+      const checkInterval = setInterval(() => {
+        if (pdfQuizQuestions.length > nextIndex) {
+          clearInterval(checkInterval);
+          setCurrentQuestionIndex(nextIndex);
+          showNextQuestion(pdfQuizQuestions[nextIndex], nextIndex + 1);
+        }
+      }, 500);
+
+      // 타임아웃: 30초 후에는 interval 정리
+      setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 30000);
+    }
   };
 
   return (
@@ -324,19 +349,13 @@ function DocumentAnalyzer() {
             className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
           >
-            💭 Q&A 챗봇
+            💭 Q&A
           </button>
           <button
             className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
             onClick={() => setActiveTab('quiz')}
           >
             📝 퀴즈
-          </button>
-          <button
-            className={`tab-btn ${activeTab === 'pdf-quiz' ? 'active' : ''}`}
-            onClick={() => setActiveTab('pdf-quiz')}
-          >
-            🤖 PDF 퀴즈 챗봇
           </button>
         </div>
 
@@ -352,7 +371,7 @@ function DocumentAnalyzer() {
           {/* AI 챗봇 탭 */}
           {activeTab === 'chat' && (
             <div className="tab-panel">
-              <h2>Q&A 챗봇</h2>
+              <h2>Q&A</h2>
               <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '-10px', marginBottom: '20px' }}>
                 업로드한 문서를 기반으로 AI에게 자유롭게 질문해보세요
               </p>
@@ -409,195 +428,124 @@ function DocumentAnalyzer() {
           {/* 퀴즈 탭 */}
           {activeTab === 'quiz' && (
             <div className="tab-panel">
-              <h2>문제 풀기</h2>
+              <h2>퀴즈</h2>
               <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '-10px', marginBottom: '20px' }}>
-                문서 내용을 기반으로 객관식 문제를 생성합니다. <br />
-                문제 수와 난이도를 선택해주세요. 문제 수는 최대 10개까지 생성할 수 있습니다.
+                업로드한 문서를 기반으로 AI 퀴즈를 풀어보세요
               </p>
-              <div className="quiz-section">
-                <div className="quiz-settings">
-                  <div className="setting-item">
-                    <label>문제 수:</label>
-                    <input
-                      type="number"
-                      value={numQuestions}
-                      onChange={(e) => setNumQuestions(parseInt(e.target.value))}
-                      min="1"
-                      max="10"
-                      className="number-input"
-                    />
+
+              {/* 퀴즈 설정 */}
+              {!isQuizMode && (
+                <div className="quiz-settings-section">
+                  <div className="setting-group">
+                    <label>파일 선택:</label>
+                    <select
+                      value={selectedFileUri}
+                      onChange={(e) => setSelectedFileUri(e.target.value)}
+                      className="setting-select"
+                      disabled={pdfQuizLoading}
+                    >
+                      <option value="">파일을 선택하세요</option>
+                      {uploadedFiles.map((file, index) => (
+                        <option key={index} value={file.name}>
+                          {file.display_name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="setting-item">
+
+                  <div className="setting-group">
                     <label>난이도:</label>
                     <select
                       value={difficulty}
                       onChange={(e) => setDifficulty(e.target.value)}
-                      className="difficulty-select"
+                      className="setting-select"
+                      disabled={pdfQuizLoading}
                     >
                       <option value="easy">쉬움</option>
                       <option value="medium">보통</option>
                       <option value="hard">어려움</option>
                     </select>
                   </div>
+
                   <button
-                    onClick={generateQuiz}
-                    disabled={loading || uploadedFiles.length === 0}
-                    className="generate-btn"
+                    onClick={handleGenerateQuizFromFile}
+                    disabled={pdfQuizLoading || !selectedFileUri || uploadedFiles.length === 0}
+                    className="action-btn primary"
                   >
-                    {loading ? '퀴즈 생성 중...' : '퀴즈 생성'}
+                    {pdfQuizLoading ? '퀴즈 생성 중...' : '퀴즈 시작'}
                   </button>
+
+                  {uploadedFiles.length === 0 && (
+                    <p className="empty-message">
+                      홈 화면에서 PDF 파일을 먼저 업로드해주세요.
+                    </p>
+                  )}
+
+                  <p style={{ fontSize: '0.85rem', color: '#8b5cf6', marginTop: '1rem', textAlign: 'center' }}>
+                    💡 답을 제출하면 자동으로 다음 문제가 생성됩니다
+                  </p>
+                </div>
+              )}
+
+              {/* 채팅 섹션 */}
+              <div className="chat-section">
+                <div className="chat-history">
+                  {pdfQuizMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`chat-message ${msg.role}`}
+                    >
+                      <div className="message-label">
+                        {msg.role === 'user' ? '👤 사용자' : '🤖 AI'}
+                      </div>
+                      <div className="message-content">
+                        <pre style={{ whiteSpace: 'pre-wrap', wordWrap: 'break-word', margin: 0, fontFamily: 'inherit' }}>
+                          {msg.content}
+                        </pre>
+                      </div>
+                    </div>
+                  ))}
+                  {pdfQuizMessages.length === 1 && !isQuizMode && (
+                    <p className="empty-message">
+                      파일을 선택하고 퀴즈를 시작해주세요!
+                    </p>
+                  )}
+                  {pdfQuizLoading && (
+                    <div className="chat-message assistant">
+                      <div className="message-label">🤖 AI</div>
+                      <div className="message-content">
+                        <span style={{ color: '#8b5cf6' }}>생각하는 중...</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {quiz && (
-                  <div className="quiz-result">
-                    <h3>{quiz.quiz_title}</h3>
-                    <p className="quiz-meta">
-                      문제 수: {quiz.total_questions} | 난이도: {quiz.difficulty}
-                    </p>
-                    <div className="questions-list">
-                      {quiz.questions && quiz.questions.map((q, index) => (
-                        <div key={index} className="question-card">
-                          <h4>문제 {q.question_number}</h4>
-                          <div
-                            className="question-text"
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(q.question_text) }}
-                          />
-                          <div className="options">
-                            {q.options && q.options.map((option, optIndex) => (
-                              <div
-                                key={optIndex}
-                                className="option"
-                                dangerouslySetInnerHTML={{ __html: renderMarkdown(option) }}
-                              />
-                            ))}
-                          </div>
-                          <div className="answer-section">
-                            <p>
-                              <strong>정답:</strong>{' '}
-                              <span dangerouslySetInnerHTML={{ __html: renderMarkdown(q.correct_answer) }} />
-                            </p>
-                            <p>
-                              <strong>해설:</strong>{' '}
-                              <span dangerouslySetInnerHTML={{ __html: renderMarkdown(q.explanation) }} />
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* PDF 퀴즈 챗봇 탭 */}
-          {activeTab === 'pdf-quiz' && (
-            <div className="tab-panel pdf-quiz-chatbot">
-              <div className="chatbot-container">
-                {/* 사이드바 */}
-                <aside className="chatbot-sidebar">
-                  <div className="sidebar-header">
-                    <button className="new-chat-btn" onClick={handleNewChat}>
-                      <span className="icon">+</span> 새 대화
+                {/* 입력창 */}
+                {isQuizMode && (
+                  <div className="chat-input">
+                    <textarea
+                      value={pdfQuizInput}
+                      onChange={(e) => setPdfQuizInput(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handlePdfQuizSendMessage();
+                        }
+                      }}
+                      placeholder="정답을 입력하세요..."
+                      rows={3}
+                      className="chat-textarea"
+                      disabled={pdfQuizLoading}
+                    />
+                    <button
+                      onClick={handlePdfQuizSendMessage}
+                      disabled={pdfQuizLoading || !pdfQuizInput.trim()}
+                      className="send-btn"
+                    >
+                      {pdfQuizLoading ? '전송 중...' : '전송'}
                     </button>
                   </div>
-
-                  <div className="conversations-list">
-                    {conversations.map((conv) => (
-                      <div
-                        key={conv.id}
-                        className={`conversation-item ${conv.active ? 'active' : ''}`}
-                        onClick={() => handleSelectConversation(conv.id)}
-                      >
-                        <span className="conversation-icon">💬</span>
-                        <span className="conversation-title">{conv.title}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="sidebar-footer">
-                    <div className="user-info">
-                      <span className="user-avatar">👤</span>
-                      <span className="user-name">사용자</span>
-                    </div>
-                  </div>
-                </aside>
-
-                {/* 메인 채팅 */}
-                <main className="chatbot-main">
-                  <div className="chat-header">
-                    <h2>PDF 퀴즈 챗봇</h2>
-                    <p className="chat-subtitle">PDF 업로드로 퀴즈를 만들어드립니다.</p>
-                  </div>
-
-                  <div className="messages-container" ref={messagesContainerRef}>
-                    {pdfQuizMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
-                      >
-                        <div className="message-avatar">
-                          {msg.role === 'user' ? '👤' : '🤖'}
-                        </div>
-                        <div className="message-content">
-                          <pre className="message-text">{msg.content}</pre>
-                        </div>
-                      </div>
-                    ))}
-
-                    {pdfQuizLoading && (
-                      <div className="message assistant-message">
-                        <div className="message-avatar">🤖</div>
-                        <div className="message-content typing-indicator">
-                          <span></span><span></span><span></span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 입력창 */}
-                  <div className="input-container">
-                    <input
-                      ref={pdfQuizFileInputRef}
-                      type="file"
-                      accept="application/pdf"
-                      style={{ display: 'none' }}
-                      onChange={handlePdfQuizFileSelect}
-                    />
-
-                    <div className="input-wrapper">
-                      {/* 파일 첨부 버튼 */}
-                      <button
-                        className="file-upload-button"
-                        onClick={() => pdfQuizFileInputRef.current.click()}
-                        title="PDF 업로드"
-                        disabled={pdfQuizLoading}
-                      >
-                        📎
-                      </button>
-
-                      <textarea
-                        value={pdfQuizInput}
-                        onChange={(e) => setPdfQuizInput(e.target.value)}
-                        placeholder="메시지를 입력하거나 PDF를 첨부하세요..."
-                        rows="1"
-                        disabled={pdfQuizLoading}
-                      />
-
-                      <button
-                        className="send-button"
-                        onClick={handlePdfQuizSendMessage}
-                        disabled={pdfQuizLoading}
-                      >
-                        🚀
-                      </button>
-                    </div>
-
-                    <p className="input-hint">
-                      AI가 생성한 정보는 참고용입니다. 중요한 내용은 반드시 검토하세요.
-                    </p>
-                  </div>
-                </main>
+                )}
               </div>
             </div>
           )}

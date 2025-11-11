@@ -143,26 +143,53 @@ function Home() {
             </div>
           )}
 
-          <div className="file-input-container">
+          <div className="file-upload-area">
             <input
               type="file"
               accept=".pdf"
               onChange={handleFileChange}
-              className="file-input"
+              className="file-input-hidden"
+              id="file-input"
             />
-            {file && (
-              <p className="selected-file">선택된 파일: {file.name}</p>
-            )}
-          </div>
 
-          <div className="action-buttons">
-            <button
-              onClick={handleUpload}
-              disabled={loading || !file}
-              className="action-btn primary"
-            >
-              {loading ? '업로드 중...' : '업로드'}
-            </button>
+            {!file ? (
+              <label htmlFor="file-input" className="file-select-label">
+                <div className="upload-icon">📄</div>
+                <div className="upload-text">
+                  <p className="upload-title">PDF 파일 선택하기</p>
+                  <p className="upload-subtitle">클릭하여 파일을 선택하세요</p>
+                </div>
+              </label>
+            ) : (
+              <div className="file-selected-container">
+                <div className="file-selected-info">
+                  <span className="file-icon">📄</span>
+                  <div className="file-details">
+                    <p className="file-name">{file.name}</p>
+                    <p className="file-size">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                </div>
+                <div className="file-actions">
+                  <button
+                    onClick={handleUpload}
+                    disabled={loading}
+                    className="action-btn primary"
+                  >
+                    {loading ? '업로드 중...' : '업로드'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setFile(null);
+                      setError(null);
+                    }}
+                    disabled={loading}
+                    className="action-btn secondary"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 업로드된 파일 목록 */}
