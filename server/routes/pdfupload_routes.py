@@ -242,6 +242,75 @@ async def generate_quiz_with_gemini(
         raise Exception(f"퀴즈 생성 실패: {str(e)}")
 
 
+@router.post("/generate-from-uploaded")
+async def generate_quiz_from_uploaded_file(request: Dict[str, Any]):
+    """
+    이미 업로드된 PDF 파일로 Gemini API를 사용한 고품질 퀴즈 생성
+
+    Request body:
+    {
+        "file_name": "files/abc123",
+        "num_questions": 5,
+        "difficulty": "medium",
+        "question_type": "multiple_choice"
+    }
+
+    Returns:
+    - success: 성공 여부
+    - questions: 생성된 문제 목록
+    - file_name: 파일 이름
+    """
+    file_name = request.get("file_name")
+    num_questions = request.get("num_questions", 5)
+    difficulty = request.get("difficulty", "medium")
+    question_type = request.get("question_type", "multiple_choice")
+
+    if not file_name:
+        raise HTTPException(
+            status_code=400,
+            detail="file_name이 필요합니다."
+        )
+
+    try:
+        # PDFLoader로 업로드된 파일 찾기
+        loader = get_pdf_loader()
+
+        uploaded_file = None
+        for file in loader.uploaded_files:
+            if file.name == file_name:
+                uploaded_file = file
+                break
+
+        if uploaded_file is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"파일을 찾을 수 없습니다: {file_name}"
+            )
+
+        # Gemini API를 사용하여 퀴즈 생성
+        questions = await generate_quiz_with_gemini(
+            uploaded_file,
+            num_questions=num_questions,
+            difficulty=difficulty,
+            question_type=question_type
+        )
+
+        return {
+            "success": True,
+            "questions": questions,
+            "file_name": uploaded_file.display_name,
+            "total_questions": len(questions)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"퀴즈 생성 중 오류 발생: {str(e)}"
+        )
+
+
 @router.get("/health")
 async def health_check():
     """퀴즈 생성 서비스 상태 확인"""
