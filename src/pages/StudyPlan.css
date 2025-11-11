@@ -64,7 +64,7 @@
 }
 
 .tab-item.completed:not(.active) {
-  background: #d4edda;
+  background: #e9ecef;
 }
 
 .tab-item:not(.disabled):not(.active):hover {
@@ -92,7 +92,7 @@
 }
 
 .tab-item.completed:not(.active) .tab-number {
-  background: #28a745;
+  background: #6c757d;
   color: white;
 }
 
@@ -797,6 +797,27 @@
 .generate-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.next-button {
+  margin-top: 1.5rem;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.next-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 .loading-message,

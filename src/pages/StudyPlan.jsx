@@ -317,9 +317,6 @@ function StudyPlan() {
   // 날짜 선택 핸들러
   const handleDateSelect = (date) => {
     setStartDate(date);
-    if (date) {
-      setActiveTab(4); // 4단계 탭으로 이동
-    }
   };
 
   return (
@@ -371,7 +368,6 @@ function StudyPlan() {
               <div className="banner-text">
                 <p className="banner-label">선택된 종목</p>
                 <p className="banner-title">{selectedSubject.name}</p>
-                <p className="banner-code">종목코드: {selectedSubject.code}</p>
               </div>
             </div>
             <button
@@ -424,7 +420,6 @@ function StudyPlan() {
                               className="subject-card"
                               onClick={() => handleSubjectSelect(item)}
                             >
-                              <div className="subject-code">[{jmCode}]</div>
                               <div className="subject-name">{jmName}</div>
                             </div>
                           );
@@ -531,7 +526,6 @@ function StudyPlan() {
                             >
                               <span className="list-icon">📄</span>
                               <span className="list-name">{jmName}</span>
-                              <span className="list-code">[{jmCode}]</span>
                             </div>
                           );
                         })}
@@ -558,7 +552,7 @@ function StudyPlan() {
                   <div className="summary-items">
                     <div className="summary-item">
                       <span className="summary-label">선택한 종목:</span>
-                      <span className="summary-value">{selectedSubject.name} ({selectedSubject.code})</span>
+                      <span className="summary-value">{selectedSubject.name}</span>
                     </div>
                   </div>
                 </div>
@@ -629,7 +623,7 @@ function StudyPlan() {
                   <div className="summary-items">
                     <div className="summary-item">
                       <span className="summary-label">선택한 종목:</span>
-                      <span className="summary-value">{selectedSubject.name} ({selectedSubject.code})</span>
+                      <span className="summary-value">{selectedSubject.name}</span>
                     </div>
                     <div className="summary-item">
                       <span className="summary-label">선택한 시험 일정:</span>
@@ -660,14 +654,22 @@ function StudyPlan() {
                 className="date-input"
               />
               {startDate && (
-                <p className="date-info">
-                  선택된 날짜: <strong>{new Date(startDate).toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    weekday: 'long'
-                  })}</strong>
-                </p>
+                <>
+                  <p className="date-info">
+                    선택된 날짜: <strong>{new Date(startDate).toLocaleDateString('ko-KR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      weekday: 'long'
+                    })}</strong>
+                  </p>
+                  <button
+                    className="next-button"
+                    onClick={() => setActiveTab(4)}
+                  >
+                    다음 단계로 →
+                  </button>
+                </>
               )}
                 </div>
               </div>
@@ -686,7 +688,7 @@ function StudyPlan() {
                   <div className="summary-items">
                     <div className="summary-item">
                       <span className="summary-label">선택한 종목:</span>
-                      <span className="summary-value">{selectedSubject.name} ({selectedSubject.code})</span>
+                      <span className="summary-value">{selectedSubject.name}</span>
                     </div>
                     <div className="summary-item">
                       <span className="summary-label">선택한 시험 일정:</span>
