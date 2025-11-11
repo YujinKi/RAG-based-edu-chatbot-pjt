@@ -228,7 +228,7 @@ function DocumentAnalyzer() {
         setPdfQuizQuestions(data.questions); // 5문제 모두 저장
         setCurrentQuestionIndex(0);
         setIsQuizMode(true);
-        addPdfQuizBotMessage(`퀴즈를 시작합니다! ${data.questions.length}개의 문제가 준비되었습니다 😄`);
+        addPdfQuizBotMessage(`퀴즈를 시작합니다! 😄`);
         showNextQuestion(data.questions[0], 1);
       } else {
         addPdfQuizBotMessage('❌ 문제 생성에 실패했습니다. 다시 시도해주세요.');
@@ -283,9 +283,28 @@ function DocumentAnalyzer() {
     const currentQ = pdfQuizQuestions[currentQuestionIndex];
     const correct = currentQ.answer.trim();
     const explanation = currentQ.explanation;
+    const options = currentQ.options || [];
+
+    // 사용자 답변 처리
+    let userAnswer = answerText.trim();
+
+    // 숫자 입력인 경우 (1, 2, 3, 4) 해당 선택지로 변환
+    const numberMatch = userAnswer.match(/^[1-4]$/);
+    if (numberMatch && options.length > 0) {
+      const optionIndex = parseInt(userAnswer) - 1;
+      if (optionIndex >= 0 && optionIndex < options.length) {
+        userAnswer = options[optionIndex];
+      }
+    }
+
+    // 정답 체크 (대소문자 구분 없이, 공백 제거)
+    const isCorrect =
+      userAnswer.toLowerCase().includes(correct.toLowerCase()) ||
+      correct.toLowerCase().includes(userAnswer.toLowerCase()) ||
+      userAnswer.toLowerCase() === correct.toLowerCase();
 
     // 정답/오답 피드백
-    if (answerText.includes(correct) || answerText === correct) {
+    if (isCorrect) {
       let feedback = '✅ 정답입니다! 잘하셨어요 👏';
       if (explanation) {
         feedback += `\n\n💡 해설: ${explanation}`;
