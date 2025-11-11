@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './DocumentAnalyzer.css';
+import { uploadPdfToServer } from './PdfUploader';
 
 function DocumentAnalyzer() {
   // 마크다운 텍스트를 HTML로 변환하는 함수
@@ -53,14 +54,10 @@ function DocumentAnalyzer() {
 
     return html;
   };
-  const [activeTab, setActiveTab] = useState('upload');
-  const [file, setFile] = useState(null);
+  const [activeTab, setActiveTab] = useState('chat');
   const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [selectedFileUri, setSelectedFileUri] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  // PDF 분석 관련 - 제거됨
 
   // RAG 관련
   const [chatMessage, setChatMessage] = useState('');
@@ -72,57 +69,37 @@ function DocumentAnalyzer() {
   const [numQuestions, setNumQuestions] = useState(5);
   const [difficulty, setDifficulty] = useState('medium');
 
+  // PDF 퀴즈 챗봇 관련
+  const [pdfQuizMessages, setPdfQuizMessages] = useState([
+    {
+      id: 1,
+      role: 'assistant',
+      content: '안녕하세요! 학습 도우미 AI입니다 😊\nPDF를 업로드하면 자동으로 문제를 만들어드릴게요!',
+      timestamp: new Date()
+    }
+  ]);
+  const [pdfQuizInput, setPdfQuizInput] = useState('');
+  const [pdfQuizLoading, setPdfQuizLoading] = useState(false);
+  const [pdfQuizQuestions, setPdfQuizQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isQuizMode, setIsQuizMode] = useState(false);
+  const [conversations, setConversations] = useState([{ id: 1, title: '새 대화', active: true }]);
+  const [activeConversationId, setActiveConversationId] = useState(1);
+
+  const messagesContainerRef = useRef(null);
+  const pdfQuizFileInputRef = useRef(null);
+
   // 업로드된 파일 목록 로드
   useEffect(() => {
     loadUploadedFiles();
   }, []);
 
-  // 파일 선택 핸들러
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile && selectedFile.type === 'application/pdf') {
-      setFile(selectedFile);
-      setError(null);
-    } else {
-      setError('PDF 파일만 업로드 가능합니다.');
-      setFile(null);
+  // PDF 퀴즈 챗봇 메시지 자동 스크롤
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  };
-
-  // 파일 업로드
-  const handleUpload = async () => {
-    if (!file) {
-      setError('파일을 선택해주세요.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const response = await fetch('http://localhost:3001/api/pdf/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Upload failed');
-      }
-
-      const data = await response.json();
-      alert('파일 업로드 성공!');
-      setFile(null);
-      loadUploadedFiles();
-    } catch (err) {
-      setError('업로드 실패: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [pdfQuizMessages]);
 
   // 업로드된 파일 목록 로드
   const loadUploadedFiles = async () => {
@@ -220,46 +197,129 @@ function DocumentAnalyzer() {
     }
   };
 
-  // 개별 파일 삭제
-  const deleteFile = async (fileName) => {
-    if (!window.confirm('이 파일을 삭제하시겠습니까?')) return;
+  // PDF 퀴즈 챗봇 헬퍼 함수
+  const addPdfQuizBotMessage = (content) => {
+    setPdfQuizMessages((prev) => [
+      ...prev,
+      { id: prev.length + 1, role: 'assistant', content, timestamp: new Date() }
+    ]);
+  };
 
-    setLoading(true);
-    setError(null);
+  const addPdfQuizUserMessage = (content) => {
+    setPdfQuizMessages((prev) => [
+      ...prev,
+      { id: prev.length + 1, role: 'user', content, timestamp: new Date() }
+    ]);
+  };
 
-    try {
-      const response = await fetch(`http://localhost:3001/api/pdf/delete-file/${fileName}`, {
-        method: 'DELETE'
-      });
+  const showNextQuestion = (qObj) => {
+    const formatted = `📘 문제 ${currentQuestionIndex + 1}\n${qObj.question}\n\n${qObj.options
+      .map((opt, i) => `${i + 1}) ${opt}`)
+      .join('\n')}`;
+    addPdfQuizBotMessage(formatted);
+  };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to delete file');
-      }
+  // PDF 퀴즈 챗봇 메시지 전송
+  const handlePdfQuizSendMessage = async () => {
+    if (!pdfQuizInput.trim()) return;
+    const message = pdfQuizInput.trim();
+    addPdfQuizUserMessage(message);
+    setPdfQuizInput('');
 
-      // 파일 목록 새로고침
-      loadUploadedFiles();
-    } catch (err) {
-      setError('파일 삭제 실패: ' + err.message);
-    } finally {
-      setLoading(false);
+    // 퀴즈 모드 중이라면 정답 판별
+    if (isQuizMode && pdfQuizQuestions.length > 0) {
+      handleQuizAnswer(message);
+      return;
     }
+
+    // 일반 채팅
+    addPdfQuizBotMessage('PDF를 업로드하면 문제를 만들어드릴게요!');
+  };
+
+  // PDF 퀴즈 파일 선택
+  const handlePdfQuizFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    addPdfQuizUserMessage(`📎 ${file.name} 업로드`);
+    setPdfQuizLoading(true);
+
+    const data = await uploadPdfToServer(file);
+    setPdfQuizLoading(false);
+
+    if (data.success && data.questions && data.questions.length > 0) {
+      setPdfQuizQuestions(data.questions);
+      setCurrentQuestionIndex(0);
+      setIsQuizMode(true);
+      addPdfQuizBotMessage(`PDF 분석이 완료되었습니다! 총 ${data.total_questions}개의 문제를 생성했습니다. 퀴즈를 시작할게요 😄`);
+      showNextQuestion(data.questions[0]);
+    } else {
+      const errorMsg = data.message || '문제 생성에 실패했습니다';
+      addPdfQuizBotMessage(`❌ ${errorMsg}. 다시 시도해주세요.`);
+    }
+
+    // 업로드 후 input 초기화
+    e.target.value = '';
+  };
+
+  // 퀴즈 정답 처리
+  const handleQuizAnswer = (answerText) => {
+    const currentQ = pdfQuizQuestions[currentQuestionIndex];
+    const correct = currentQ.answer.trim();
+
+    if (answerText.includes(correct) || answerText === correct) {
+      addPdfQuizBotMessage('✅ 정답입니다! 잘하셨어요 👏');
+    } else {
+      addPdfQuizBotMessage(`❌ 오답이에요. 정답은 '${correct}'입니다.`);
+    }
+
+    const next = currentQuestionIndex + 1;
+    if (next < pdfQuizQuestions.length) {
+      setCurrentQuestionIndex(next);
+      setTimeout(() => showNextQuestion(pdfQuizQuestions[next]), 1000);
+    } else {
+      addPdfQuizBotMessage('🎉 모든 문제를 완료했습니다! 수고하셨어요!');
+      setIsQuizMode(false);
+    }
+  };
+
+  // 새 대화 시작
+  const handleNewChat = () => {
+    setConversations((prev) =>
+      prev.map((c) => ({ ...c, active: false })).concat({
+        id: prev.length + 1,
+        title: '새 대화',
+        active: true
+      })
+    );
+    setPdfQuizMessages([
+      {
+        id: 1,
+        role: 'assistant',
+        content: '새 대화를 시작합니다. PDF를 업로드하면 문제를 만들어드릴게요 😊',
+        timestamp: new Date()
+      }
+    ]);
+    setIsQuizMode(false);
+    setPdfQuizQuestions([]);
+    setCurrentQuestionIndex(0);
+  };
+
+  const handleSelectConversation = (convId) => {
+    setConversations((prev) =>
+      prev.map((c) => ({ ...c, active: c.id === convId }))
+    );
+    setActiveConversationId(convId);
   };
 
   return (
     <div className="page-container">
       <h1>학습 자료 분석</h1>
-      <p>PDF 문서를 업로드하고 AI로 분석하세요</p>
+      <p>업로드된 PDF 문서를 기반으로 AI 분석, 질문답변, 퀴즈를 이용하세요</p>
 
       <div className="document-analyzer-container">
         {/* 탭 네비게이션 */}
         <div className="tab-navigation">
-          <button
-            className={`tab-btn ${activeTab === 'upload' ? 'active' : ''}`}
-            onClick={() => setActiveTab('upload')}
-          >
-            📤 업로드
-          </button>
           <button
             className={`tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
@@ -272,6 +332,12 @@ function DocumentAnalyzer() {
           >
             📝 퀴즈
           </button>
+          <button
+            className={`tab-btn ${activeTab === 'pdf-quiz' ? 'active' : ''}`}
+            onClick={() => setActiveTab('pdf-quiz')}
+          >
+            🤖 PDF 퀴즈 챗봇
+          </button>
         </div>
 
         {/* 에러 메시지 */}
@@ -283,64 +349,6 @@ function DocumentAnalyzer() {
 
         {/* 탭 콘텐츠 */}
         <div className="tab-content">
-          {/* 업로드 탭 */}
-          {activeTab === 'upload' && (
-            <div className="tab-panel">
-              <div className="upload-section">
-                <h2>PDF 파일 업로드</h2>
-                <div className="file-input-container">
-                  <input
-                    type="file"
-                    accept=".pdf"
-                    onChange={handleFileChange}
-                    className="file-input"
-                  />
-                  {file && (
-                    <p className="selected-file">선택된 파일: {file.name}</p>
-                  )}
-                </div>
-
-                <div className="action-buttons">
-                  <button
-                    onClick={handleUpload}
-                    disabled={loading || !file}
-                    className="action-btn primary"
-                  >
-                    {loading ? '업로드 중...' : '업로드'}
-                  </button>
-                </div>
-
-                <div className="uploaded-files-section">
-                  <div className="section-header">
-                    <h3>업로드된 파일 목록 ({uploadedFiles.length})</h3>
-                  </div>
-                  <div className="file-list">
-                    {uploadedFiles.map((f, index) => (
-                      <div key={index} className="file-item">
-                        <span className="file-icon">📄</span>
-                        <div className="file-info">
-                          <p className="file-name">{f.display_name}</p>
-                          <p className="file-meta">{f.state} • {f.uri}</p>
-                        </div>
-                        <button
-                          onClick={() => deleteFile(f.name)}
-                          disabled={loading}
-                          className="delete-file-btn"
-                          title="파일 삭제"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    ))}
-                    {uploadedFiles.length === 0 && (
-                      <p className="no-files">업로드된 파일이 없습니다</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* AI 챗봇 탭 */}
           {activeTab === 'chat' && (
             <div className="tab-panel">
@@ -478,6 +486,118 @@ function DocumentAnalyzer() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* PDF 퀴즈 챗봇 탭 */}
+          {activeTab === 'pdf-quiz' && (
+            <div className="tab-panel pdf-quiz-chatbot">
+              <div className="chatbot-container">
+                {/* 사이드바 */}
+                <aside className="chatbot-sidebar">
+                  <div className="sidebar-header">
+                    <button className="new-chat-btn" onClick={handleNewChat}>
+                      <span className="icon">+</span> 새 대화
+                    </button>
+                  </div>
+
+                  <div className="conversations-list">
+                    {conversations.map((conv) => (
+                      <div
+                        key={conv.id}
+                        className={`conversation-item ${conv.active ? 'active' : ''}`}
+                        onClick={() => handleSelectConversation(conv.id)}
+                      >
+                        <span className="conversation-icon">💬</span>
+                        <span className="conversation-title">{conv.title}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="sidebar-footer">
+                    <div className="user-info">
+                      <span className="user-avatar">👤</span>
+                      <span className="user-name">사용자</span>
+                    </div>
+                  </div>
+                </aside>
+
+                {/* 메인 채팅 */}
+                <main className="chatbot-main">
+                  <div className="chat-header">
+                    <h2>PDF 퀴즈 챗봇</h2>
+                    <p className="chat-subtitle">PDF 업로드로 퀴즈를 만들어드립니다.</p>
+                  </div>
+
+                  <div className="messages-container" ref={messagesContainerRef}>
+                    {pdfQuizMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
+                      >
+                        <div className="message-avatar">
+                          {msg.role === 'user' ? '👤' : '🤖'}
+                        </div>
+                        <div className="message-content">
+                          <pre className="message-text">{msg.content}</pre>
+                        </div>
+                      </div>
+                    ))}
+
+                    {pdfQuizLoading && (
+                      <div className="message assistant-message">
+                        <div className="message-avatar">🤖</div>
+                        <div className="message-content typing-indicator">
+                          <span></span><span></span><span></span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 입력창 */}
+                  <div className="input-container">
+                    <input
+                      ref={pdfQuizFileInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      style={{ display: 'none' }}
+                      onChange={handlePdfQuizFileSelect}
+                    />
+
+                    <div className="input-wrapper">
+                      {/* 파일 첨부 버튼 */}
+                      <button
+                        className="file-upload-button"
+                        onClick={() => pdfQuizFileInputRef.current.click()}
+                        title="PDF 업로드"
+                        disabled={pdfQuizLoading}
+                      >
+                        📎
+                      </button>
+
+                      <textarea
+                        value={pdfQuizInput}
+                        onChange={(e) => setPdfQuizInput(e.target.value)}
+                        placeholder="메시지를 입력하거나 PDF를 첨부하세요..."
+                        rows="1"
+                        disabled={pdfQuizLoading}
+                      />
+
+                      <button
+                        className="send-button"
+                        onClick={handlePdfQuizSendMessage}
+                        disabled={pdfQuizLoading}
+                      >
+                        🚀
+                      </button>
+                    </div>
+
+                    <p className="input-hint">
+                      AI가 생성한 정보는 참고용입니다. 중요한 내용은 반드시 검토하세요.
+                    </p>
+                  </div>
+                </main>
               </div>
             </div>
           )}

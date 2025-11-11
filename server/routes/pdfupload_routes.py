@@ -1,100 +1,252 @@
-# main.py
+"""
+PDF Upload Quiz Generation Routes
+PDF 파일 업로드 및 Gemini API 기반 고품질 퀴즈 생성 엔드포인트
+"""
+
 import os
-import random
-import fitz  # PyMuPDF
-import re
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from pyngrok import ngrok
-import nest_asyncio
-import uvicorn
+import json
+from fastapi import APIRouter, HTTPException, File, UploadFile, Form
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel
 
-# ============================================
-# ⚙️ FastAPI 앱 초기화
-# ============================================
-app = FastAPI(title="멀티에이전트 문제 생성 서버")
+from services.pdf_service import get_pdf_loader
+from config.settings import UPLOAD_DIR, MAX_FILE_SIZE, GEMINI_API_KEY
+import google.generativeai as genai
 
-# ✅ CORS 설정 (React 접근 허용)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 개발용 - 모든 출처 허용
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
-UPLOAD_DIR = "uploads"
+router = APIRouter(prefix="/api/quiz", tags=["Quiz Generation"])
+
+
+# Request/Response 모델
+class GenerateQuizRequest(BaseModel):
+    num_questions: Optional[int] = 5
+    difficulty: Optional[str] = "medium"  # easy, medium, hard
+    question_type: Optional[str] = "multiple_choice"  # multiple_choice, true_false, fill_blank
+
+
+# uploads 디렉토리가 없으면 생성
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# ============================================
-# 🧩 PDF 업로드 엔드포인트
-# ============================================
-@app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    file_path = os.path.join(UPLOAD_DIR, file.filename)
-    with open(file_path, "wb") as f:
-        f.write(await file.read())
+# Gemini API 설정
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
-    # ✅ PDF 텍스트 추출
-    text = ""
-    with fitz.open(file_path) as pdf:
-        for page in pdf:
-            text += page.get_text("text")
 
-    # ✅ 텍스트 정제
-    text = re.sub(r"http\S+|www\S+|https\S+", "", text)
-    text = re.sub(r"[\w\.-]+@[\w\.-]+", "", text)
-    text = re.sub(r"페이지\s*\d+\s*/\s*\d+", "", text)
-    text = re.sub(r"\s{2,}", " ", text)
-    text = re.sub(r"[^가-힣a-zA-Z0-9.,?!\s]", "", text)
-    text = re.sub(r"시나공|만든이|기출문제|자격증|블로그|카페", "", text, flags=re.IGNORECASE)
+@router.post("/upload-and-generate")
+async def upload_pdf_and_generate_quiz(
+    file: UploadFile = File(...),
+    num_questions: int = Form(5),
+    difficulty: str = Form("medium"),
+    question_type: str = Form("multiple_choice")
+):
+    """
+    PDF 파일 업로드 및 Gemini API를 사용한 고품질 퀴즈 생성
 
-    # ✅ 문장 분리 및 문제 생성
-    sentences = [s.strip() for s in text.split(".") if len(s.strip()) > 20]
+    Request:
+    - file: PDF 파일 (multipart/form-data)
+    - num_questions: 생성할 문제 수 (기본: 5)
+    - difficulty: 난이도 (easy, medium, hard)
+    - question_type: 문제 유형 (multiple_choice, true_false, fill_blank)
 
-    def generate_mcq(sentence):
-        words = sentence.split()
-        if len(words) < 5:
-            return None
-        answer = random.choice(words).strip(",.!?():")
-        options = [answer]
-        while len(options) < 4:
-            fake = random.choice(words).strip(",.!?():")
-            if fake not in options:
-                options.append(fake)
-        random.shuffle(options)
+    Returns:
+    - success: 성공 여부
+    - questions: 생성된 문제 목록
+    - file_name: 파일 이름
+    """
+    # PDF 파일 확인
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(
+            status_code=400,
+            detail="PDF 파일만 업로드 가능합니다."
+        )
+
+    # 파일 크기 확인
+    file_content = await file.read()
+    if len(file_content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"파일 크기가 너무 큽니다. 최대 {MAX_FILE_SIZE // (1024*1024)}MB까지 업로드 가능합니다."
+        )
+
+    # 파일을 임시로 저장
+    temp_file_path = os.path.join(UPLOAD_DIR, file.filename)
+
+    try:
+        # 파일 저장
+        with open(temp_file_path, "wb") as f:
+            f.write(file_content)
+
+        # PDFLoader로 Gemini API에 업로드
+        loader = get_pdf_loader()
+        uploaded_file = loader.upload_pdf(temp_file_path, display_name=file.filename)
+
+        # 파일 처리 대기
+        processed_file = loader.wait_for_file_processing(uploaded_file)
+
+        # Gemini API를 사용하여 퀴즈 생성
+        questions = await generate_quiz_with_gemini(
+            processed_file,
+            num_questions=num_questions,
+            difficulty=difficulty,
+            question_type=question_type
+        )
+
+        # 파일 삭제 (선택사항)
+        loader.delete_file(processed_file)
+
         return {
-            "question": sentence.replace(answer, "_____"),
-            "options": options,
-            "answer": answer,
+            "success": True,
+            "questions": questions,
+            "file_name": file.filename,
+            "total_questions": len(questions)
         }
 
-    quizzes = [q for s in sentences[:5] if (q := generate_mcq(s))]
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"퀴즈 생성 중 오류 발생: {str(e)}"
+        )
 
-    return {"status": "success", "questions": quizzes}
+    finally:
+        # 임시 파일 삭제
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
-# ============================================
-# 🧠 루트 엔드포인트
-# ============================================
-@app.get("/")
-def root():
-    return {"message": "멀티에이전트 서버 정상 작동 중 🚀"}
 
-# ============================================
-# 🚀 메인 실행부
-# ============================================
-if __name__ == "__main__":
-    import nest_asyncio
+async def generate_quiz_with_gemini(
+    pdf_file,
+    num_questions: int = 5,
+    difficulty: str = "medium",
+    question_type: str = "multiple_choice"
+) -> List[Dict[str, Any]]:
+    """
+    Gemini API를 사용하여 PDF에서 고품질 퀴즈 생성
 
-    # ngrok 토큰 등록
-    ngrok.set_auth_token("3594V0xG8PgXKGAGW4fxS4V6RzR_3oWjxFrJ6WMaW2jwysG44")
+    Args:
+        pdf_file: Gemini에 업로드된 PDF 파일 객체
+        num_questions: 생성할 문제 수
+        difficulty: 난이도 (easy, medium, hard)
+        question_type: 문제 유형 (multiple_choice, true_false, fill_blank)
 
-    # ngrok 포트 연결 (8000)
-    public_url = ngrok.connect(8000)
-    print("🌍 외부 접속 URL:", public_url.public_url)
+    Returns:
+        생성된 문제 목록
+    """
+    # 난이도별 설명
+    difficulty_descriptions = {
+        "easy": "기본적인 개념 이해를 확인하는 쉬운 수준",
+        "medium": "개념 적용과 이해를 요구하는 중간 수준",
+        "hard": "깊은 이해와 응용력을 요구하는 어려운 수준"
+    }
 
-    # Colab 환경이 아니더라도 nest_asyncio 적용 가능
-    nest_asyncio.apply()
+    # 문제 유형별 프롬프트
+    if question_type == "multiple_choice":
+        format_instruction = """
+각 문제는 다음 JSON 형식으로 작성해주세요:
+{
+    "question": "문제 내용",
+    "options": ["선택지1", "선택지2", "선택지3", "선택지4"],
+    "answer": "정답",
+    "explanation": "해설"
+}
+"""
+    elif question_type == "true_false":
+        format_instruction = """
+각 문제는 다음 JSON 형식으로 작성해주세요:
+{
+    "question": "문제 내용 (참/거짓 판단)",
+    "answer": "참" 또는 "거짓",
+    "explanation": "해설"
+}
+"""
+    elif question_type == "fill_blank":
+        format_instruction = """
+각 문제는 다음 JSON 형식으로 작성해주세요:
+{
+    "question": "빈칸이 포함된 문제 내용 (_____를 사용)",
+    "answer": "정답",
+    "explanation": "해설"
+}
+"""
+    else:
+        format_instruction = """
+각 문제는 다음 JSON 형식으로 작성해주세요:
+{
+    "question": "문제 내용",
+    "options": ["선택지1", "선택지2", "선택지3", "선택지4"],
+    "answer": "정답",
+    "explanation": "해설"
+}
+"""
 
-    # FastAPI 실행
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Gemini 프롬프트 작성
+    prompt = f"""
+당신은 전문적인 시험 문제 출제자입니다. 제공된 PDF 문서를 분석하여 고품질의 학습 문제를 생성해주세요.
+
+**문제 생성 요구사항:**
+- 문제 수: {num_questions}개
+- 난이도: {difficulty} ({difficulty_descriptions.get(difficulty, '')})
+- 문제 유형: {question_type}
+
+**문제 생성 가이드라인:**
+1. 문서의 핵심 내용을 정확히 반영하는 문제를 만들어주세요
+2. 문맥과 논리를 고려하여 의미 있는 문제를 생성해주세요
+3. 오답 선택지는 그럴듯하지만 명확히 틀린 것으로 만들어주세요
+4. 모든 문제에 대해 자세한 해설을 포함해주세요
+5. 문제는 서로 독립적이고 중복되지 않아야 합니다
+
+{format_instruction}
+
+**중요: 반드시 JSON 배열 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.**
+응답 예시: [{{ "question": "...", "options": [...], "answer": "...", "explanation": "..." }}, ...]
+"""
+
+    try:
+        # Gemini 모델 초기화
+        model = genai.GenerativeModel("gemini-2.5-flash")
+
+        # PDF와 함께 프롬프트 전송
+        response = model.generate_content([pdf_file, prompt])
+
+        # 응답 텍스트 추출
+        response_text = response.text.strip()
+
+        print(f"🤖 Gemini 응답 받음 (길이: {len(response_text)})")
+        print(f"📝 응답 미리보기: {response_text[:200]}...")
+
+        # JSON 파싱 시도
+        # 마크다운 코드 블록 제거
+        if response_text.startswith("```json"):
+            response_text = response_text[7:]
+        if response_text.startswith("```"):
+            response_text = response_text[3:]
+        if response_text.endswith("```"):
+            response_text = response_text[:-3]
+        response_text = response_text.strip()
+
+        # JSON 파싱
+        questions = json.loads(response_text)
+
+        if not isinstance(questions, list):
+            raise ValueError("응답이 리스트 형식이 아닙니다")
+
+        return questions[:num_questions]  # 요청한 문제 수만큼 반환
+
+    except json.JSONDecodeError as e:
+        print(f"❌ JSON 파싱 오류: {str(e)}")
+        print(f"📄 전체 응답:\n{response_text}")
+        raise Exception(f"Gemini 응답을 파싱하는 중 오류 발생: {str(e)}\n응답 내용: {response_text[:500]}")
+    except Exception as e:
+        print(f"❌ 퀴즈 생성 오류: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise Exception(f"퀴즈 생성 실패: {str(e)}")
+
+
+@router.get("/health")
+async def health_check():
+    """퀴즈 생성 서비스 상태 확인"""
+    return {
+        "status": "ok",
+        "service": "Quiz Generation with Gemini API",
+        "gemini_configured": bool(GEMINI_API_KEY)
+    }
