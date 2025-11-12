@@ -128,6 +128,7 @@ function StudyPlan() {
           console.log('✅ 시험 일정 캐시에서 즉시 로드');
           setExamSchedules(data);
           setSelectedSchedule(data[0]);
+          setLoadingSchedules(false);
           setError(null);
           return; // 캐시가 있으면 여기서 바로 종료
         }

@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel
 
 from services.pdf_service import get_pdf_loader
+from services.quiz_service import get_quiz_service
 from config.settings import UPLOAD_DIR, MAX_FILE_SIZE, GEMINI_API_KEY
 import google.generativeai as genai
 
@@ -83,8 +84,9 @@ async def upload_pdf_and_generate_quiz(
         # 파일 처리 대기
         processed_file = loader.wait_for_file_processing(uploaded_file)
 
-        # Gemini API를 사용하여 퀴즈 생성
-        questions = await generate_quiz_with_gemini(
+        # QuizService를 사용하여 퀴즈 생성
+        quiz_service = get_quiz_service()
+        questions = quiz_service.generate_quiz(
             processed_file,
             num_questions=num_questions,
             difficulty=difficulty,
@@ -113,133 +115,8 @@ async def upload_pdf_and_generate_quiz(
             os.remove(temp_file_path)
 
 
-async def generate_quiz_with_gemini(
-    pdf_file,
-    num_questions: int = 5,
-    difficulty: str = "medium",
-    question_type: str = "multiple_choice"
-) -> List[Dict[str, Any]]:
-    """
-    Gemini API를 사용하여 PDF에서 고품질 퀴즈 생성
-
-    Args:
-        pdf_file: Gemini에 업로드된 PDF 파일 객체
-        num_questions: 생성할 문제 수
-        difficulty: 난이도 (easy, medium, hard)
-        question_type: 문제 유형 (multiple_choice, true_false, fill_blank)
-
-    Returns:
-        생성된 문제 목록
-    """
-    # 난이도별 설명
-    difficulty_descriptions = {
-        "easy": "기본적인 개념 이해를 확인하는 쉬운 수준",
-        "medium": "개념 적용과 이해를 요구하는 중간 수준",
-        "hard": "깊은 이해와 응용력을 요구하는 어려운 수준"
-    }
-
-    # 문제 유형별 프롬프트
-    if question_type == "multiple_choice":
-        format_instruction = """
-각 문제는 다음 JSON 형식으로 작성해주세요:
-{
-    "question": "문제 내용",
-    "options": ["선택지1", "선택지2", "선택지3", "선택지4"],
-    "answer": "정답",
-    "explanation": "해설"
-}
-"""
-    elif question_type == "true_false":
-        format_instruction = """
-각 문제는 다음 JSON 형식으로 작성해주세요:
-{
-    "question": "문제 내용 (참/거짓 판단)",
-    "answer": "참" 또는 "거짓",
-    "explanation": "해설"
-}
-"""
-    elif question_type == "fill_blank":
-        format_instruction = """
-각 문제는 다음 JSON 형식으로 작성해주세요:
-{
-    "question": "빈칸이 포함된 문제 내용 (_____를 사용)",
-    "answer": "정답",
-    "explanation": "해설"
-}
-"""
-    else:
-        format_instruction = """
-각 문제는 다음 JSON 형식으로 작성해주세요:
-{
-    "question": "문제 내용",
-    "options": ["선택지1", "선택지2", "선택지3", "선택지4"],
-    "answer": "정답",
-    "explanation": "해설"
-}
-"""
-
-    # Gemini 프롬프트 작성
-    prompt = f"""
-당신은 전문적인 시험 문제 출제자입니다. 제공된 PDF 문서를 분석하여 고품질의 학습 문제를 생성해주세요.
-
-**문제 생성 요구사항:**
-- 문제 수: {num_questions}개
-- 난이도: {difficulty} ({difficulty_descriptions.get(difficulty, '')})
-- 문제 유형: {question_type}
-
-**문제 생성 가이드라인:**
-1. 문서의 핵심 내용을 정확히 반영하는 문제를 만들어주세요
-2. 문맥과 논리를 고려하여 의미 있는 문제를 생성해주세요
-3. 오답 선택지는 그럴듯하지만 명확히 틀린 것으로 만들어주세요
-4. 모든 문제에 대해 자세한 해설을 포함해주세요
-5. 문제는 서로 독립적이고 중복되지 않아야 합니다
-
-{format_instruction}
-
-**중요: 반드시 JSON 배열 형식으로만 응답해주세요. 다른 텍스트는 포함하지 마세요.**
-응답 예시: [{{ "question": "...", "options": [...], "answer": "...", "explanation": "..." }}, ...]
-"""
-
-    try:
-        # Gemini 모델 초기화
-        model = genai.GenerativeModel("gemini-2.5-flash")
-
-        # PDF와 함께 프롬프트 전송
-        response = model.generate_content([pdf_file, prompt])
-
-        # 응답 텍스트 추출
-        response_text = response.text.strip()
-
-        print(f"🤖 Gemini 응답 받음 (길이: {len(response_text)})")
-        print(f"📝 응답 미리보기: {response_text[:200]}...")
-
-        # JSON 파싱 시도
-        # 마크다운 코드 블록 제거
-        if response_text.startswith("```json"):
-            response_text = response_text[7:]
-        if response_text.startswith("```"):
-            response_text = response_text[3:]
-        if response_text.endswith("```"):
-            response_text = response_text[:-3]
-        response_text = response_text.strip()
-
-        # JSON 파싱
-        questions = json.loads(response_text)
-
-        if not isinstance(questions, list):
-            raise ValueError("응답이 리스트 형식이 아닙니다")
-
-        return questions[:num_questions]  # 요청한 문제 수만큼 반환
-
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON 파싱 오류: {str(e)}")
-        print(f"📄 전체 응답:\n{response_text}")
-        raise Exception(f"Gemini 응답을 파싱하는 중 오류 발생: {str(e)}\n응답 내용: {response_text[:500]}")
-    except Exception as e:
-        print(f"❌ 퀴즈 생성 오류: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        raise Exception(f"퀴즈 생성 실패: {str(e)}")
+# 퀴즈 생성 로직은 quiz_service.py로 이동됨
+# 라우트는 얇은 레이어로 유지
 
 
 @router.post("/generate-from-uploaded")
@@ -287,8 +164,9 @@ async def generate_quiz_from_uploaded_file(request: Dict[str, Any]):
                 detail=f"파일을 찾을 수 없습니다: {file_name}"
             )
 
-        # Gemini API를 사용하여 퀴즈 생성
-        questions = await generate_quiz_with_gemini(
+        # QuizService를 사용하여 퀴즈 생성
+        quiz_service = get_quiz_service()
+        questions = quiz_service.generate_quiz(
             uploaded_file,
             num_questions=num_questions,
             difficulty=difficulty,
