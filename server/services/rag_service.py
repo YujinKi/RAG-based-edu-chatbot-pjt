@@ -13,6 +13,7 @@ from services.embedding_service import get_embedding_service
 from services.pdf_service import get_pdf_loader
 from services.search_service import get_search_service
 from services.vector_db_service import get_vector_db_service
+from services.quiz_service import get_quiz_service
 
 
 class RAGService:
@@ -213,6 +214,7 @@ class RAGService:
             # 1단계: FAISS 벡터 DB에서 관련 청크 검색
             print(f"🔍 FAISS 벡터 DB에서 관련 정보 검색 중...")
             vector_context = ""
+            search_results_metadata = []  # 출처 메타데이터 저장
             try:
                 # 파일 이름 추출 (첫 번째 파일 기준)
                 file_name = files[0].display_name if files else None
@@ -229,6 +231,18 @@ class RAGService:
                             f"[관련 문서 청크 {idx+1}] (유사도: {result['score']:.4f}):\n{result['text']}"
                             for idx, result in enumerate(search_results)
                         ])
+
+                        # 메타데이터 저장 (출처 추적용)
+                        search_results_metadata = [
+                            {
+                                "chunk_id": idx + 1,
+                                "text_preview": result['text'][:200] + "..." if len(result['text']) > 200 else result['text'],
+                                "similarity_score": round(result['score'], 4),
+                                "metadata": result.get('metadata', {})
+                            }
+                            for idx, result in enumerate(search_results)
+                        ]
+
                         print(f"✅ FAISS에서 {len(search_results)}개 청크 검색 완료")
                     else:
                         print(f"⚠️ FAISS에서 관련 정보를 찾지 못했습니다")
@@ -346,7 +360,11 @@ class RAGService:
                 "conversation_id": conversation_id,
                 "message": message,
                 "answer": final_answer,
-                "sources": [f.display_name for f in files],
+                "sources": {
+                    "files": [f.display_name for f in files],
+                    "retrieved_chunks": search_results_metadata if search_results_metadata else [],
+                    "web_search": search_used
+                },
                 "model": model_name,
                 "history_length": len(self.conversation_history[conversation_id]),
                 "search_used": search_used
@@ -387,15 +405,17 @@ class RAGService:
         file_uri: str,
         num_questions: int = 5,
         difficulty: str = "medium",
+        question_type: str = "multiple_choice",
         model_name: str = "gemini-2.5-flash"
     ) -> Dict[str, Any]:
         """
-        문서 내용 기반 퀴즈 생성
+        문서 내용 기반 퀴즈 생성 (QuizService 사용)
 
         Args:
             file_uri: 문서 파일 URI
             num_questions: 생성할 문제 수
             difficulty: 난이도 (easy, medium, hard)
+            question_type: 문제 유형 (multiple_choice, true_false, fill_blank)
             model_name: 사용할 Gemini 모델
 
         Returns:
@@ -407,66 +427,23 @@ class RAGService:
             if not file_obj:
                 raise ValueError(f"파일을 찾을 수 없습니다: {file_uri}")
 
-            # 모델 생성
-            model = genai.GenerativeModel(model_name)
+            # QuizService 사용
+            quiz_service = get_quiz_service()
+            questions = quiz_service.generate_quiz(
+                file_obj=file_obj,
+                num_questions=num_questions,
+                difficulty=difficulty,
+                question_type=question_type,
+                model_name=model_name
+            )
 
-            # 퀴즈 생성 프롬프트
-            difficulty_kr = {"easy": "쉬움", "medium": "보통", "hard": "어려움"}.get(difficulty, "보통")
-
-            prompt = f"""이 문서의 내용을 기반으로 **{num_questions}개의 객관식 문제**를 생성해주세요.
-
-**요구사항:**
-- 난이도: {difficulty_kr}
-- 각 문제는 4개의 선택지를 가져야 합니다
-- 정답과 해설을 포함해주세요
-- 문서의 핵심 내용을 다루는 문제여야 합니다
-
-**출력 형식 (JSON):**
-```json
-{{
-    "quiz_title": "퀴즈 제목",
-    "total_questions": {num_questions},
-    "difficulty": "{difficulty}",
-    "questions": [
-        {{
-            "question_number": 1,
-            "question_text": "문제 내용",
-            "options": [
-                "1) 선택지 1",
-                "2) 선택지 2",
-                "3) 선택지 3",
-                "4) 선택지 4"
-            ],
-            "correct_answer": "정답 번호 (1~4)",
-            "explanation": "해설 내용"
-        }}
-    ]
-}}
-```
-
-JSON 형식으로만 응답해주세요.
-"""
-
-            # 퀴즈 생성
-            response = model.generate_content([file_obj, prompt])
-
-            # JSON 파싱
-            import json
-            result_text = response.text.strip()
-
-            # 마크다운 코드 블록 제거
-            if result_text.startswith("```"):
-                result_text = result_text.split("```")[1]
-                if result_text.startswith("json"):
-                    result_text = result_text[4:]
-
-            quiz_data = json.loads(result_text)
-
-            print(f"✅ 퀴즈 생성 완료: {num_questions}개 문제")
+            print(f"✅ 퀴즈 생성 완료: {len(questions)}개 문제")
 
             return {
                 "success": True,
-                "quiz": quiz_data,
+                "questions": questions,
+                "total_questions": len(questions),
+                "difficulty": difficulty,
                 "source_file": file_obj.display_name
             }
 
