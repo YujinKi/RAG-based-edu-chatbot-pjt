@@ -240,14 +240,11 @@ graph LR
 ---
 ## **6. 시연 영상**
 
-<details>
 <summary><b>🎬 챗봇 시연 영상</b></summary>
 
 <br>
 
 https://github.com/user-attachments/assets/fb1ea390-018a-432c-b721-3f20dda68017
-
-</details>
 
 ---
 
