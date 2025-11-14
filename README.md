@@ -238,8 +238,20 @@ graph LR
 -->
 
 ---
+## **6. 시연 영상**
 
-## **6. 팀원 소개**
+<details>
+<summary><b>🎬 챗봇 시연 영상</b></summary>
+
+<br>
+
+https://github.com/user-attachments/assets/fb1ea390-018a-432c-b721-3f20dda68017
+
+</details>
+
+---
+
+## **7. 팀원 소개**
 
 | ![기유진](https://avatars.githubusercontent.com/u/156163982?v=4) | ![김종주](https://avatars.githubusercontent.com/u/156163982?v=4) | ![오화영](https://avatars.githubusercontent.com/u/156163982?v=4) | 
 | :--------------------------------------------------------------: | :--------------------------------------------------------------: | :--------------------------------------------------------------: |
@@ -253,7 +265,7 @@ graph LR
 
 ---
 
-## **7. Appendix**
+## **8. Appendix**
 ### **7.1 참고 자료**
 - **API 문서:** [OpenAI API Reference](https://platform.openai.com/docs/api-reference), [Gemini API Documentation](https://ai.google.dev/gemini-api/docs)
 - **프레임워크:** [FastAPI 공식 문서](https://fastapi.tiangolo.com/)
